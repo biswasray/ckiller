@@ -1,0 +1,31 @@
+{
+  "name": "ckiller",
+  "version": "1.0.0",
+  "description": "Claude Skill and Subagent runner.",
+  "private": true,
+  "author": "Subhasish Biswasray",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/biswasray/ckiller.git"
+  },
+  "bugs": {
+    "url": "https://github.com/biswasray/ckiller/issues"
+  },
+  "homepage": "https://github.com/biswasray/ckiller#readme",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "lerna run build",
+    "dev": "lerna run dev --parallel",
+    "lint": "lerna run lint",
+    "clean": "lerna run clean",
+    "test": "lerna run test"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.0",
+    "lerna": "^8.1.5",
+    "typescript": "^5.4.5"
+  }
+}

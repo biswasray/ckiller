@@ -1,0 +1,26 @@
+{
+  "name": "@ckiller/server",
+  "version": "1.0.0",
+  "description": "ckiller Express server.",
+  "main": "./dist/index.js",
+  "license": "ISC",
+  "bin": {
+    "ckiller-server": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p ./",
+    "start": "node dist/index.js",
+    "dev": "nodemon --watch src --ext ts --exec \"npm run build && npm run start\"",
+    "lint": "tsc -p ./ --noEmit",
+    "clean": "rm -rf dist",
+    "test": "echo \"(server) no tests\" && exit 0"
+  },
+  "dependencies": {
+    "@ckiller/universe": "1.0.0",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "nodemon": "3.1.14"
+  }
+}

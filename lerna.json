@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/lerna/schema.json",
+  "version": "1.0.0",
+  "npmClient": "npm",
+  "command": {
+    "version": {
+      "conventionalCommits": false
+    },
+    "run": {
+      "stream": true
+    }
+  }
+}

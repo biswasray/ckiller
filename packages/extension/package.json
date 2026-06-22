@@ -1,0 +1,40 @@
+{
+  "name": "@ckiller/extension",
+  "displayName": "ckiller",
+  "version": "1.0.0",
+  "description": "Claude Skill and Subagent runner.",
+  "publisher": "biswasray",
+  "license": "ISC",
+  "engines": {
+    "vscode": "^1.90.0",
+    "node": ">=18"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "ckiller.run",
+        "title": "ckiller: Run Skill or Subagent"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "dev": "tsc -watch -p ./",
+    "lint": "tsc -p ./ --noEmit",
+    "clean": "rm -rf dist",
+    "test": "echo \"(extension) no tests\" && exit 0"
+  },
+  "dependencies": {
+    "@ckiller/universe": "1.0.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0"
+  }
+}

@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.vsix
+.vscode-test/
+out/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
