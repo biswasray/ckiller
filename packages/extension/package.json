@@ -27,7 +27,7 @@
     "build": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "dev": "tsc -watch -p ./",
-    "lint": "tsc -p ./ --noEmit",
+    "typecheck": "tsc -p ./ --noEmit",
     "clean": "rm -rf dist",
     "test": "echo \"(extension) no tests\" && exit 0"
   },
