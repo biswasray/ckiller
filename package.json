@@ -19,6 +19,7 @@
   "scripts": {
     "build": "lerna run build",
     "dev": "lerna run dev --parallel",
+    "dev:server": "lerna run dev --scope @ckiller/server",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
