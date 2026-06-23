@@ -33,3 +33,5 @@ app.listen(port, () => {
   console.log(`${APP_NAME} server listening on http://localhost:${port}`);
   openUrl(`http://localhost:${port}`);
 });
+
+console.log("Server is starting...", process.argv);

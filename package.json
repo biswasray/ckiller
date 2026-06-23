@@ -16,10 +16,14 @@
   "workspaces": [
     "packages/*"
   ],
+  "bin": {
+    "ckiller": "./packages/server/dist/index.js"
+  },
   "scripts": {
     "build": "lerna run build",
     "dev": "lerna run dev --parallel",
     "dev:server": "lerna run dev --scope @ckiller/server",
+    "dev:client": "lerna run dev --scope @ckiller/client",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
