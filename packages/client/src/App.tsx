@@ -1,4 +1,4 @@
-import { APP_NAME, APP_VERSION, greet } from "@ckiller/universe";
+import { APP_NAME, APP_VERSION, greet } from "@ckiller/universe/browser";
 
 export function App() {
   return (
