@@ -24,7 +24,7 @@
     "build": "lerna run build",
     "dev": "lerna run dev --parallel",
     "dev:server": "lerna run dev --parallel --scope @ckiller/universe --scope @ckiller/server",
-    "dev:client": "lerna run dev --parallel --scope @ckiller/universe --scope@ckiller/client",
+    "dev:client": "lerna run dev --parallel --scope @ckiller/universe --scope @ckiller/client",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

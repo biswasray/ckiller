@@ -8,8 +8,19 @@ export interface WorkflowNode {
   task?: string;
 }
 
+export type Port = "top" | "bottom" | "left" | "right";
+
+export interface WorkflowConnector {
+  id: string;
+  sourceId: string;
+  sourcePort: Port;
+  targetId: string;
+  targetPort: Port;
+}
+
 interface WorkflowState {
   nodes: WorkflowNode[];
+  connectors: WorkflowConnector[];
   scale: number;
 }
 
@@ -23,6 +34,7 @@ const clampScale = (value: number) =>
 
 const initialState: WorkflowState = {
   nodes: [],
+  connectors: [],
   scale: 1,
 };
 
@@ -49,7 +61,11 @@ export const workflowSlice = createSlice({
       }
     },
     removeNode: (state, action: PayloadAction<string>) => {
-      state.nodes = state.nodes.filter((n) => n.id !== action.payload);
+      const id = action.payload;
+      state.nodes = state.nodes.filter((n) => n.id !== id);
+      state.connectors = state.connectors.filter(
+        (c) => c.sourceId !== id && c.targetId !== id,
+      );
     },
     duplicateNode: (state, action: PayloadAction<string>) => {
       const node = state.nodes.find((n) => n.id === action.payload);
@@ -72,6 +88,30 @@ export const workflowSlice = createSlice({
         node.task = action.payload.task.trim() || undefined;
       }
     },
+    addConnector: {
+      reducer: (state, action: PayloadAction<WorkflowConnector>) => {
+        const c = action.payload;
+        if (c.sourceId === c.targetId) return; // no self-links
+        const duplicate = state.connectors.some(
+          (e) =>
+            e.sourceId === c.sourceId &&
+            e.sourcePort === c.sourcePort &&
+            e.targetId === c.targetId &&
+            e.targetPort === c.targetPort,
+        );
+        if (duplicate) return;
+        state.connectors.push(c);
+      },
+      prepare: (input: {
+        sourceId: string;
+        sourcePort: Port;
+        targetId: string;
+        targetPort: Port;
+      }) => ({ payload: { id: nanoid(), ...input } }),
+    },
+    removeConnector: (state, action: PayloadAction<string>) => {
+      state.connectors = state.connectors.filter((c) => c.id !== action.payload);
+    },
     setScale: (state, action: PayloadAction<number>) => {
       state.scale = clampScale(action.payload);
     },
@@ -93,6 +133,8 @@ export const {
   removeNode,
   duplicateNode,
   setTask,
+  addConnector,
+  removeConnector,
   setScale,
   zoomIn,
   zoomOut,

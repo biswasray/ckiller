@@ -1,8 +1,8 @@
-import { useRef, useState } from "react";
-import type { PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { useTheme } from "../../../store/hooks";
 import type { Skill } from "../../../interfaces";
-import type { WorkflowNode } from "../../../store/workflowSlice";
+import type { Port, WorkflowNode } from "../../../store/workflowSlice";
 import { Card } from "../../ui/Card";
 import { IconButton } from "../../ui/IconButton";
 import { Label } from "../../ui/Label";
@@ -16,6 +16,14 @@ import {
 } from "../../ui/icons";
 
 const CARD_WIDTH = 260;
+const PORTS: Port[] = ["top", "bottom", "left", "right"];
+
+const PORT_POSITION: Record<Port, CSSProperties> = {
+  top: { left: "50%", top: 0 },
+  bottom: { left: "50%", top: "100%" },
+  left: { left: 0, top: "50%" },
+  right: { left: "100%", top: "50%" },
+};
 
 interface WorkflowCardProps {
   node: WorkflowNode;
@@ -27,6 +35,12 @@ interface WorkflowCardProps {
   onDelete: (id: string) => void;
   onSetTask: (id: string, task: string) => void;
   onRun: (id: string) => void;
+  onResize: (id: string, w: number, h: number) => void;
+  onPortPointerDown: (
+    nodeId: string,
+    port: Port,
+    e: ReactPointerEvent<HTMLElement>,
+  ) => void;
 }
 
 export function WorkflowCard({
@@ -38,6 +52,8 @@ export function WorkflowCard({
   onDelete,
   onSetTask,
   onRun,
+  onResize,
+  onPortPointerDown,
 }: WorkflowCardProps) {
   const { theme } = useTheme();
   // Pointer position at drag start and the node origin at that moment.
@@ -47,10 +63,22 @@ export function WorkflowCard({
     nx: number;
     ny: number;
   } | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(node.task ?? "");
 
   const inputMode = !node.task || editing;
+
+  // Report the card's rendered size so the canvas can anchor connector ports.
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const report = () => onResize(node.id, el.offsetWidth, el.offsetHeight);
+    report();
+    const observer = new ResizeObserver(report);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [node.id, onResize]);
 
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -85,6 +113,7 @@ export function WorkflowCard({
 
   return (
     <div
+      ref={rootRef}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={endDrag}
@@ -98,6 +127,31 @@ export function WorkflowCard({
         touchAction: "none",
       }}
     >
+      {PORTS.map((port) => (
+        <span
+          key={port}
+          data-node-id={node.id}
+          data-port={port}
+          title="Drag to connect"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onPortPointerDown(node.id, port, e);
+          }}
+          style={{
+            position: "absolute",
+            ...PORT_POSITION[port],
+            width: 12,
+            height: 12,
+            borderRadius: "50%",
+            background: theme.colors.surface,
+            border: `2px solid ${theme.colors.textSecondary}`,
+            transform: "translate(-50%, -50%)",
+            cursor: "crosshair",
+            zIndex: 2,
+          }}
+        />
+      ))}
+
       <Card style={{ position: "relative" }}>
         <div
           style={{
