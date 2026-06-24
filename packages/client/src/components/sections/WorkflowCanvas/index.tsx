@@ -8,6 +8,7 @@ import {
   moveNode,
   removeNode,
   resetZoom,
+  setTask,
   zoomIn,
   zoomOut,
 } from "../../../store/workflowSlice";
@@ -94,6 +95,8 @@ export function WorkflowCanvas() {
             onMove={(id, x, y) => dispatch(moveNode({ id, x, y }))}
             onDuplicate={(id) => dispatch(duplicateNode(id))}
             onDelete={(id) => dispatch(removeNode(id))}
+            onSetTask={(id, task) => dispatch(setTask({ id, task }))}
+            onRun={(id) => console.log("run", id)}
           />
         ))}
       </div>

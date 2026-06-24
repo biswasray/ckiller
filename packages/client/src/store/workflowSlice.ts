@@ -5,6 +5,7 @@ export interface WorkflowNode {
   skillName: string;
   x: number;
   y: number;
+  task?: string;
 }
 
 interface WorkflowState {
@@ -58,7 +59,17 @@ export const workflowSlice = createSlice({
           skillName: node.skillName,
           x: node.x + DUPLICATE_OFFSET,
           y: node.y + DUPLICATE_OFFSET,
+          task: node.task,
         });
+      }
+    },
+    setTask: (
+      state,
+      action: PayloadAction<{ id: string; task: string }>,
+    ) => {
+      const node = state.nodes.find((n) => n.id === action.payload.id);
+      if (node) {
+        node.task = action.payload.task.trim() || undefined;
       }
     },
     setScale: (state, action: PayloadAction<number>) => {
@@ -81,6 +92,7 @@ export const {
   moveNode,
   removeNode,
   duplicateNode,
+  setTask,
   setScale,
   zoomIn,
   zoomOut,
