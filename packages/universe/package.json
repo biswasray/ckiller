@@ -4,17 +4,17 @@
   "description": "Shared utils and constants for ckiller.",
   "main": "./dist/cjs/index.node.js",
   "module": "./dist/esm/index.node.js",
-  "types": "./src/index.node.ts",
+  "types": "./dist/esm/index.node.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.node.ts",
-      "browser": "./src/index.browser.ts",
-      "import": "./src/index.node.ts",
+      "types": "./dist/esm/index.node.d.ts",
+      "browser": "./dist/esm/index.browser.js",
+      "import": "./dist/esm/index.node.js",
       "require": "./dist/cjs/index.node.js",
       "default": "./dist/cjs/index.node.js"
     },
     "./node": {
-      "types": "./src/index.node.ts",
+      "types": "./dist/esm/index.node.d.ts",
       "import": "./dist/esm/index.node.js",
       "require": "./dist/cjs/index.node.js",
       "default": "./dist/cjs/index.node.js"

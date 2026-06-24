@@ -17,13 +17,14 @@
     "packages/*"
   ],
   "bin": {
-    "ckiller": "./packages/server/dist/index.js"
+    "ckiller": "./packages/server/dist/index.js",
+    "ckiller-dev": "./dev-cli.mjs"
   },
   "scripts": {
     "build": "lerna run build",
     "dev": "lerna run dev --parallel",
-    "dev:server": "lerna run dev --scope @ckiller/server",
-    "dev:client": "lerna run dev --scope @ckiller/client",
+    "dev:server": "lerna run dev --parallel --scope @ckiller/universe --scope @ckiller/server",
+    "dev:client": "lerna run dev --parallel --scope @ckiller/universe --scope@ckiller/client",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
