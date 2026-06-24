@@ -14,11 +14,13 @@ import { persistConfig } from "./persistConfig";
 import { loaderReducer } from "./loaderSlice";
 import { skillsReducer } from "./skillsSlice";
 import { themeReducer } from "./themeSlice";
+import { workflowReducer } from "./workflowSlice";
 
 const rootReducer = combineReducers({
   loader: loaderReducer,
   theme: themeReducer,
   skills: skillsReducer,
+  workflow: workflowReducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

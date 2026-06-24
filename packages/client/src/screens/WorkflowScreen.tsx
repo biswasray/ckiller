@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Card,
   CollapsibleSection,
   Header,
   Label,
   Sidebar,
+  SKILL_DRAG_MIME,
   TextInput,
+  WorkflowCanvas,
 } from "../components";
 import { useAppDispatch, useAppSelector, useTheme } from "../store/hooks";
 import { fetchSkills } from "../store/skillsSlice";
@@ -73,11 +74,16 @@ export function WorkflowScreen() {
                 <li
                   key={skill.name}
                   title={skill.description}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(SKILL_DRAG_MIME, skill.name);
+                    e.dataTransfer.effectAllowed = "copy";
+                  }}
                   style={{
                     padding: `${theme.spacing.xs}px 0`,
                     color: theme.colors.textSecondary,
                     fontSize: theme.typography.fontSize.md,
-                    cursor: "default",
+                    cursor: "grab",
                   }}
                 >
                   {skill.name}
@@ -97,42 +103,7 @@ export function WorkflowScreen() {
         }}
       >
         <Header title={title} onTitleChange={setTitle} />
-
-        <main
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: theme.spacing.xxl,
-          }}
-        >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-              gap: theme.spacing.xl,
-            }}
-          >
-            {skills.map((skill) => (
-              <Card key={skill.name} interactive>
-                <Label>{skill.name}</Label>
-                <p
-                  style={{
-                    margin: `${theme.spacing.sm}px 0 0`,
-                    color: theme.colors.textSecondary,
-                    fontSize: theme.typography.fontSize.sm,
-                    lineHeight: theme.typography.lineHeight.normal,
-                    display: "-webkit-box",
-                    WebkitLineClamp: 4,
-                    WebkitBoxOrient: "vertical",
-                    overflow: "hidden",
-                  }}
-                >
-                  {skill.description}
-                </p>
-              </Card>
-            ))}
-          </div>
-        </main>
+        <WorkflowCanvas />
       </div>
     </div>
   );
