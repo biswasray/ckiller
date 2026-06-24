@@ -8,6 +8,7 @@ import {
   greet,
   openUrl,
 } from "@ckiller/universe";
+import skillRouter from "./routes/skill";
 
 const app = express();
 const port = Number(process.env.PORT) || DEFAULT_SERVER_PORT;
@@ -21,6 +22,8 @@ app.get("/version", (_req, res) => {
     message: greet("World"),
   });
 });
+
+app.use("/skill", skillRouter);
 
 const clientDistPath = path.resolve(
   path.dirname(path.dirname(__dirname)),

@@ -5,5 +5,10 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    // Proxy API calls to the ckiller server during development.
+    proxy: {
+      "/skill": "http://localhost:3000",
+      "/version": "http://localhost:3000",
+    },
   },
 });
