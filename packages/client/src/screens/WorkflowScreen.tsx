@@ -18,6 +18,7 @@ export function WorkflowScreen() {
 
   const [title, setTitle] = useState("Unnamed");
   const [query, setQuery] = useState("");
+  const [selectMode, setSelectMode] = useState(false);
 
   useEffect(() => {
     dispatch(fetchSkills());
@@ -102,8 +103,16 @@ export function WorkflowScreen() {
           minWidth: 0,
         }}
       >
-        <Header title={title} onTitleChange={setTitle} />
-        <WorkflowCanvas />
+        <Header
+          title={title}
+          onTitleChange={setTitle}
+          selectActive={selectMode}
+          onToggleSelect={() => setSelectMode((v) => !v)}
+        />
+        <WorkflowCanvas
+          selectMode={selectMode}
+          onExitSelect={() => setSelectMode(false)}
+        />
       </div>
     </div>
   );

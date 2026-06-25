@@ -34,7 +34,14 @@ app.all("/*", express.static(clientDistPath));
 
 app.listen(port, () => {
   console.log(`${APP_NAME} server listening on http://localhost:${port}`);
-  openUrl(`http://localhost:${port}`);
+  // 1. Find the argument that starts with 'CLIENT_PORT='
+  const clientPortArg = process.argv.find((arg) =>
+    arg.startsWith("CLIENT_PORT="),
+  );
+
+  // 2. Extract the value side, or fallback to a default port
+  const CLIENT_PORT = clientPortArg ? clientPortArg.split("=")[1] : port;
+  openUrl(`http://localhost:${CLIENT_PORT}`);
 });
 
 console.log("Server is starting...", process.argv);

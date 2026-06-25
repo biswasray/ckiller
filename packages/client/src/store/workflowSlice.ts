@@ -10,6 +10,20 @@ export interface WorkflowNode {
 
 export type Port = "top" | "bottom" | "left" | "right";
 
+/**
+ * A rectangular container that visually groups nodes and/or other groups.
+ * It is connectable like a node, but never to its own descendants.
+ */
+export interface WorkflowGroup {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  childNodeIds: string[];
+  childGroupIds: string[];
+}
+
 export interface WorkflowConnector {
   id: string;
   sourceId: string;
@@ -20,8 +34,38 @@ export interface WorkflowConnector {
 
 interface WorkflowState {
   nodes: WorkflowNode[];
+  groups: WorkflowGroup[];
   connectors: WorkflowConnector[];
   scale: number;
+}
+
+/** Collect every node and group nested (directly or transitively) under a group. */
+function collectDescendants(
+  groups: WorkflowGroup[],
+  groupId: string,
+  nodeIds: Set<string>,
+  groupIds: Set<string>,
+) {
+  const group = groups.find((g) => g.id === groupId);
+  if (!group) return;
+  group.childNodeIds.forEach((id) => nodeIds.add(id));
+  group.childGroupIds.forEach((id) => {
+    if (groupIds.has(id)) return;
+    groupIds.add(id);
+    collectDescendants(groups, id, nodeIds, groupIds);
+  });
+}
+
+/** True when `candidateId` lives inside the group identified by `groupId`. */
+function isDescendant(
+  groups: WorkflowGroup[],
+  groupId: string,
+  candidateId: string,
+): boolean {
+  const nodeIds = new Set<string>();
+  const groupIds = new Set<string>();
+  collectDescendants(groups, groupId, nodeIds, groupIds);
+  return nodeIds.has(candidateId) || groupIds.has(candidateId);
 }
 
 const MIN_SCALE = 0.4;
@@ -34,6 +78,7 @@ const clampScale = (value: number) =>
 
 const initialState: WorkflowState = {
   nodes: [],
+  groups: [],
   connectors: [],
   scale: 1,
 };
@@ -66,6 +111,9 @@ export const workflowSlice = createSlice({
       state.connectors = state.connectors.filter(
         (c) => c.sourceId !== id && c.targetId !== id,
       );
+      state.groups.forEach((g) => {
+        g.childNodeIds = g.childNodeIds.filter((cid) => cid !== id);
+      });
     },
     duplicateNode: (state, action: PayloadAction<string>) => {
       const node = state.nodes.find((n) => n.id === action.payload);
@@ -88,10 +136,80 @@ export const workflowSlice = createSlice({
         node.task = action.payload.task.trim() || undefined;
       }
     },
+    addGroup: {
+      reducer: (state, action: PayloadAction<WorkflowGroup>) => {
+        const group = action.payload;
+        // A node/group may only belong to one group: detach from any other.
+        state.groups.forEach((g) => {
+          if (g.id === group.id) return;
+          g.childNodeIds = g.childNodeIds.filter(
+            (id) => !group.childNodeIds.includes(id),
+          );
+          g.childGroupIds = g.childGroupIds.filter(
+            (id) => !group.childGroupIds.includes(id),
+          );
+        });
+        state.groups.push(group);
+      },
+      prepare: (input: {
+        x: number;
+        y: number;
+        w: number;
+        h: number;
+        childNodeIds: string[];
+        childGroupIds: string[];
+      }) => ({ payload: { id: nanoid(), ...input } }),
+    },
+    moveGroup: (
+      state,
+      action: PayloadAction<{ id: string; x: number; y: number }>,
+    ) => {
+      const group = state.groups.find((g) => g.id === action.payload.id);
+      if (!group) return;
+      const dx = action.payload.x - group.x;
+      const dy = action.payload.y - group.y;
+      const nodeIds = new Set<string>();
+      const groupIds = new Set<string>();
+      collectDescendants(state.groups, group.id, nodeIds, groupIds);
+      group.x = action.payload.x;
+      group.y = action.payload.y;
+      groupIds.forEach((id) => {
+        const g = state.groups.find((s) => s.id === id);
+        if (g) {
+          g.x += dx;
+          g.y += dy;
+        }
+      });
+      nodeIds.forEach((id) => {
+        const n = state.nodes.find((s) => s.id === id);
+        if (n) {
+          n.x += dx;
+          n.y += dy;
+        }
+      });
+    },
+    removeGroup: (state, action: PayloadAction<string>) => {
+      const id = action.payload;
+      // Dissolve the group only — its children become free again.
+      state.groups = state.groups.filter((g) => g.id !== id);
+      state.groups.forEach((g) => {
+        g.childGroupIds = g.childGroupIds.filter((cid) => cid !== id);
+      });
+      state.connectors = state.connectors.filter(
+        (c) => c.sourceId !== id && c.targetId !== id,
+      );
+    },
     addConnector: {
       reducer: (state, action: PayloadAction<WorkflowConnector>) => {
         const c = action.payload;
         if (c.sourceId === c.targetId) return; // no self-links
+        // A group cannot connect to its own inner nodes/groups (either direction).
+        const srcIsGroup = state.groups.some((g) => g.id === c.sourceId);
+        const tgtIsGroup = state.groups.some((g) => g.id === c.targetId);
+        if (srcIsGroup && isDescendant(state.groups, c.sourceId, c.targetId))
+          return;
+        if (tgtIsGroup && isDescendant(state.groups, c.targetId, c.sourceId))
+          return;
         const duplicate = state.connectors.some(
           (e) =>
             e.sourceId === c.sourceId &&
@@ -133,6 +251,9 @@ export const {
   removeNode,
   duplicateNode,
   setTask,
+  addGroup,
+  moveGroup,
+  removeGroup,
   addConnector,
   removeConnector,
   setScale,

@@ -9,3 +9,4 @@ export * from "./ui/TextInput";
 export * from "./ui/icons";
 export * from "./sections/WorkflowCard";
 export * from "./sections/WorkflowCanvas";
+export * from "./sections/WorkflowGroup";

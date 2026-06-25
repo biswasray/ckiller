@@ -1,24 +1,34 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { DragEvent as ReactDragEvent, PointerEvent as ReactPointerEvent } from "react";
+import type {
+  DragEvent as ReactDragEvent,
+  PointerEvent as ReactPointerEvent,
+} from "react";
 import { useAppDispatch, useAppSelector, useTheme } from "../../../store/hooks";
 import type { Skill } from "../../../interfaces";
 import {
   addConnector,
+  addGroup,
   addNode,
   duplicateNode,
+  moveGroup,
   moveNode,
   removeConnector,
+  removeGroup,
   removeNode,
   resetZoom,
   setTask,
   zoomIn,
   zoomOut,
 } from "../../../store/workflowSlice";
-import type { Port, WorkflowNode } from "../../../store/workflowSlice";
+import type {
+  Port,
+  WorkflowGroup as Group,
+} from "../../../store/workflowSlice";
 import { IconButton } from "../../ui/IconButton";
 import { Label } from "../../ui/Label";
 import { TrashIcon } from "../../ui/icons";
 import { WorkflowCard } from "../WorkflowCard";
+import { WorkflowGroup } from "../WorkflowGroup";
 
 /** MIME type used to carry a skill name from the sidebar to the canvas. */
 export const SKILL_DRAG_MIME = "application/x-skill-name";
@@ -28,9 +38,12 @@ const WORLD_HEIGHT = 2000;
 const DEFAULT_CARD_WIDTH = 260;
 const DEFAULT_CARD_HEIGHT = 120;
 const CONTROL_OFFSET = 60;
+/** Padding between a new group's edge and the items it wraps. */
+const GROUP_PADDING = 24;
 
 type Point = { x: number; y: number };
 type Size = { w: number; h: number };
+type Rect = { x: number; y: number; w: number; h: number };
 
 const PORT_DIR: Record<Port, Point> = {
   top: { x: 0, y: -1 },
@@ -39,19 +52,50 @@ const PORT_DIR: Record<Port, Point> = {
   right: { x: 1, y: 0 },
 };
 
-function portPoint(node: WorkflowNode, port: Port, size?: Size): Point {
-  const w = size?.w ?? DEFAULT_CARD_WIDTH;
-  const h = size?.h ?? DEFAULT_CARD_HEIGHT;
+function portPoint(rect: Rect, port: Port): Point {
   switch (port) {
     case "top":
-      return { x: node.x + w / 2, y: node.y };
+      return { x: rect.x + rect.w / 2, y: rect.y };
     case "bottom":
-      return { x: node.x + w / 2, y: node.y + h };
+      return { x: rect.x + rect.w / 2, y: rect.y + rect.h };
     case "left":
-      return { x: node.x, y: node.y + h / 2 };
+      return { x: rect.x, y: rect.y + rect.h / 2 };
     case "right":
-      return { x: node.x + w, y: node.y + h / 2 };
+      return { x: rect.x + rect.w, y: rect.y + rect.h / 2 };
   }
+}
+
+/** Build a normalized rect from two corner points. */
+function rectFromPoints(a: Point, b: Point): Rect {
+  return {
+    x: Math.min(a.x, b.x),
+    y: Math.min(a.y, b.y),
+    w: Math.abs(a.x - b.x),
+    h: Math.abs(a.y - b.y),
+  };
+}
+
+function rectsIntersect(a: Rect, b: Rect): boolean {
+  return (
+    a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
+  );
+}
+
+/** Recursively collect node + group ids nested under a group. */
+function collectDescendants(
+  groups: Group[],
+  groupId: string,
+  nodeIds: Set<string>,
+  groupIds: Set<string>,
+) {
+  const group = groups.find((g) => g.id === groupId);
+  if (!group) return;
+  group.childNodeIds.forEach((id) => nodeIds.add(id));
+  group.childGroupIds.forEach((id) => {
+    if (groupIds.has(id)) return;
+    groupIds.add(id);
+    collectDescendants(groups, id, nodeIds, groupIds);
+  });
 }
 
 /** Cubic bezier path string + its midpoint (t=0.5) for the delete icon. */
@@ -72,11 +116,26 @@ function bezier(src: Point, srcPort: Port, tgt: Point, tgtPort: Port) {
   return { d, mid };
 }
 
-export function WorkflowCanvas() {
+interface WorkflowCanvasProps {
+  /** When true, dragging on the canvas draws a marquee that groups the selection. */
+  selectMode?: boolean;
+  /** Called after a marquee selection successfully creates a group. */
+  onExitSelect?: () => void;
+}
+
+export function WorkflowCanvas({
+  selectMode = false,
+  onExitSelect,
+}: WorkflowCanvasProps) {
   const { theme } = useTheme();
   const dispatch = useAppDispatch();
-  const { nodes, connectors, scale } = useAppSelector((state) => state.workflow);
-  const groups = useAppSelector((state) => state.skills.groups);
+  const {
+    nodes,
+    groups: wfGroups,
+    connectors,
+    scale,
+  } = useAppSelector((state) => state.workflow);
+  const skillGroups = useAppSelector((state) => state.skills.groups);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [sizes, setSizes] = useState<Record<string, Size>>({});
@@ -85,21 +144,35 @@ export function WorkflowCanvas() {
     sourcePort: Port;
   } | null>(null);
   const [pointerWorld, setPointerWorld] = useState<Point | null>(null);
+  const [marquee, setMarquee] = useState<{
+    start: Point;
+    current: Point;
+  } | null>(null);
 
   // name -> Skill lookup so each card can show its description.
   const skillsByName = useMemo(() => {
     const map = new Map<string, Skill>();
-    groups.forEach((group) =>
+    skillGroups.forEach((group) =>
       group.skills.forEach((skill) => map.set(skill.name, skill)),
     );
     return map;
-  }, [groups]);
+  }, [skillGroups]);
 
-  const nodesById = useMemo(() => {
-    const map = new Map<string, WorkflowNode>();
-    nodes.forEach((node) => map.set(node.id, node));
+  // id -> world-space rect for every connectable entity (nodes + groups).
+  const entitiesById = useMemo(() => {
+    const map = new Map<string, Rect>();
+    nodes.forEach((node) => {
+      const size = sizes[node.id];
+      map.set(node.id, {
+        x: node.x,
+        y: node.y,
+        w: size?.w ?? DEFAULT_CARD_WIDTH,
+        h: size?.h ?? DEFAULT_CARD_HEIGHT,
+      });
+    });
+    wfGroups.forEach((g) => map.set(g.id, { x: g.x, y: g.y, w: g.w, h: g.h }));
     return map;
-  }, [nodes]);
+  }, [nodes, wfGroups, sizes]);
 
   const handleResize = useCallback((id: string, w: number, h: number) => {
     setSizes((prev) => {
@@ -187,13 +260,13 @@ export function WorkflowCanvas() {
   // Resolve each connector to drawable geometry, skipping dangling ones.
   const drawnConnectors = connectors
     .map((connector) => {
-      const source = nodesById.get(connector.sourceId);
-      const target = nodesById.get(connector.targetId);
+      const source = entitiesById.get(connector.sourceId);
+      const target = entitiesById.get(connector.targetId);
       if (!source || !target) return null;
       const { d, mid } = bezier(
-        portPoint(source, connector.sourcePort, sizes[source.id]),
+        portPoint(source, connector.sourcePort),
         connector.sourcePort,
-        portPoint(target, connector.targetPort, sizes[target.id]),
+        portPoint(target, connector.targetPort),
         connector.targetPort,
       );
       return { id: connector.id, d, mid };
@@ -202,11 +275,57 @@ export function WorkflowCanvas() {
 
   const pendingPath = (() => {
     if (!pending || !pointerWorld) return null;
-    const source = nodesById.get(pending.sourceId);
+    const source = entitiesById.get(pending.sourceId);
     if (!source) return null;
-    const src = portPoint(source, pending.sourcePort, sizes[source.id]);
+    const src = portPoint(source, pending.sourcePort);
     return bezier(src, pending.sourcePort, pointerWorld, "left").d;
   })();
+
+  // Marquee (selection tool): build a group from everything it overlaps.
+  const finishMarquee = (m: { start: Point; current: Point }) => {
+    const area = rectFromPoints(m.start, m.current);
+    if (area.w < 8 && area.h < 8) return; // ignore stray clicks
+
+    const hitNodeIds = nodes
+      .filter((n) => {
+        const r = entitiesById.get(n.id);
+        return r && rectsIntersect(area, r);
+      })
+      .map((n) => n.id);
+    const hitGroupIds = wfGroups
+      .filter((g) => rectsIntersect(area, { x: g.x, y: g.y, w: g.w, h: g.h }))
+      .map((g) => g.id);
+
+    // Keep only top-level picks: drop anything already nested in a picked group.
+    const nested = { nodes: new Set<string>(), groups: new Set<string>() };
+    hitGroupIds.forEach((id) =>
+      collectDescendants(wfGroups, id, nested.nodes, nested.groups),
+    );
+    const childNodeIds = hitNodeIds.filter((id) => !nested.nodes.has(id));
+    const childGroupIds = hitGroupIds.filter((id) => !nested.groups.has(id));
+    if (childNodeIds.length + childGroupIds.length === 0) return;
+
+    // Wrap the union of the chosen items' bounds, padded a little.
+    const rects = [...childNodeIds, ...childGroupIds]
+      .map((id) => entitiesById.get(id))
+      .filter((r): r is Rect => Boolean(r));
+    const minX = Math.min(...rects.map((r) => r.x));
+    const minY = Math.min(...rects.map((r) => r.y));
+    const maxX = Math.max(...rects.map((r) => r.x + r.w));
+    const maxY = Math.max(...rects.map((r) => r.y + r.h));
+
+    dispatch(
+      addGroup({
+        x: minX - GROUP_PADDING,
+        y: minY - GROUP_PADDING,
+        w: maxX - minX + GROUP_PADDING * 2,
+        h: maxY - minY + GROUP_PADDING * 2,
+        childNodeIds,
+        childGroupIds,
+      }),
+    );
+    onExitSelect?.();
+  };
 
   return (
     <div
@@ -237,7 +356,12 @@ export function WorkflowCanvas() {
         <svg
           width={WORLD_WIDTH}
           height={WORLD_HEIGHT}
-          style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            pointerEvents: "none",
+          }}
         >
           <defs>
             <marker
@@ -272,6 +396,19 @@ export function WorkflowCanvas() {
             />
           )}
         </svg>
+
+        {/* Group rectangles — painted beneath the cards they contain. */}
+        {wfGroups.map((group) => (
+          <WorkflowGroup
+            key={group.id}
+            group={group}
+            scale={scale}
+            onMove={(id, x, y) => dispatch(moveGroup({ id, x, y }))}
+            onRun={(id) => console.log("run group", id)}
+            onDelete={(id) => dispatch(removeGroup(id))}
+            onPortPointerDown={handlePortPointerDown}
+          />
+        ))}
 
         {nodes.map((node) => (
           <WorkflowCard
@@ -309,6 +446,59 @@ export function WorkflowCanvas() {
             </IconButton>
           </div>
         ))}
+
+        {/* Marquee overlay — only while the selection tool is active. */}
+        {selectMode && (
+          <div
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.currentTarget.setPointerCapture(e.pointerId);
+              const start = toWorld(e.clientX, e.clientY);
+              setMarquee({ start, current: start });
+            }}
+            onPointerMove={(e) => {
+              setMarquee((prev) =>
+                prev
+                  ? { ...prev, current: toWorld(e.clientX, e.clientY) }
+                  : prev,
+              );
+            }}
+            onPointerUp={(e) => {
+              if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                e.currentTarget.releasePointerCapture(e.pointerId);
+              }
+              // Run side effects (dispatch / onExitSelect) outside the state
+              // updater — updaters must stay pure.
+              if (marquee) finishMarquee(marquee);
+              setMarquee(null);
+            }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              cursor: "crosshair",
+              zIndex: 5,
+            }}
+          >
+            {marquee &&
+              (() => {
+                const r = rectFromPoints(marquee.start, marquee.current);
+                return (
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: r.x,
+                      top: r.y,
+                      width: r.w,
+                      height: r.h,
+                      border: "2px dashed #3B82F6",
+                      background: "rgba(59, 130, 246, 0.08)",
+                      pointerEvents: "none",
+                    }}
+                  />
+                );
+              })()}
+          </div>
+        )}
       </div>
 
       {nodes.length === 0 && (
