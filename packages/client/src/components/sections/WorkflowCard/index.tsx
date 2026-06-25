@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { useTheme } from "../../../store/hooks";
+import { setAlpha, statusPalette } from "../../../utils";
 import type { Skill } from "../../../interfaces";
 import type { Port, WorkflowNode } from "../../../store/workflowSlice";
 import { Card } from "../../ui/Card";
@@ -56,6 +57,9 @@ export function WorkflowCard({
   onPortPointerDown,
 }: WorkflowCardProps) {
   const { theme } = useTheme();
+  const { accent, fill: _fill } = statusPalette(theme, node.status);
+
+  const fill = useMemo(() => setAlpha(_fill, 0.12), [_fill]);
   // Pointer position at drag start and the node origin at that moment.
   const origin = useRef<{
     px: number;
@@ -144,7 +148,7 @@ export function WorkflowCard({
             height: 12,
             borderRadius: "50%",
             background: theme.colors.surface,
-            border: `2px solid ${theme.colors.textSecondary}`,
+            border: `2px solid ${accent}`,
             transform: "translate(-50%, -50%)",
             cursor: "crosshair",
             zIndex: 2,
@@ -152,7 +156,13 @@ export function WorkflowCard({
         />
       ))}
 
-      <Card style={{ position: "relative" }}>
+      <Card
+        style={{
+          position: "relative",
+          background: fill,
+          // border: `2px solid ${accent}`,
+        }}
+      >
         <div
           style={{
             position: "absolute",

@@ -12,6 +12,7 @@ export interface ThemeColors {
   background: string;
   surface: string;
   surfaceVariant: string;
+  surfaceVariantLight: string;
   border: string;
   text: string;
   textSecondary: string;
@@ -103,18 +104,19 @@ const lightColors: ThemeColors = {
   background: "#F8F9FA",
   surface: "#FFFFFF",
   surfaceVariant: "#F1F3F5",
+  surfaceVariantLight: "#F1F3F514",
   border: "#DEE2E6",
   text: "#1A1A2E",
   textSecondary: "#6C757D",
   textDisabled: "#ADB5BD",
   error: "#DC3545",
-  errorLight: "#F8D7DA",
+  errorLight: "#DC354514",
   success: "#28A745",
-  successLight: "#D4EDDA",
+  successLight: "#28A74514",
   warning: "#FFC107",
-  warningLight: "#FFF3CD",
-  info: "#17A2B8",
-  infoLight: "#D1ECF1",
+  warningLight: "#FFC10714",
+  info: "#3B82F6",
+  infoLight: "#3B82F614",
   overlay: "rgba(0, 0, 0, 0.5)",
   shadow: "rgba(0, 0, 0, 0.1)",
 };
@@ -129,18 +131,19 @@ const darkColors: ThemeColors = {
   background: "#0D1117",
   surface: "#161B22",
   surfaceVariant: "#21262D",
+  surfaceVariantLight: "#21262D14",
   border: "#30363D",
   text: "#F0F6FC",
   textSecondary: "#8B949E",
   textDisabled: "#484F58",
   error: "#FF6B6B",
-  errorLight: "#3D1A1A",
+  errorLight: "#FF6B6B14",
   success: "#4ADE80",
-  successLight: "#1A3D2B",
+  successLight: "#4ADE8014",
   warning: "#FFD60A",
-  warningLight: "#3D3000",
+  warningLight: "#FFD60A14",
   info: "#38BDF8",
-  infoLight: "#0C2D3D",
+  infoLight: "#38BDF814",
   overlay: "rgba(0, 0, 0, 0.7)",
   shadow: "rgba(0, 0, 0, 0.4)",
 };

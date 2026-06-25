@@ -1,11 +1,15 @@
 import { createSlice, nanoid, PayloadAction } from "@reduxjs/toolkit";
 
+/** Execution state of a node or group, used to drive its color. */
+export type WorkflowStatus = "idle" | "running" | "success" | "failed";
+
 export interface WorkflowNode {
   id: string;
   skillName: string;
   x: number;
   y: number;
   task?: string;
+  status: WorkflowStatus;
 }
 
 export type Port = "top" | "bottom" | "left" | "right";
@@ -22,6 +26,7 @@ export interface WorkflowGroup {
   h: number;
   childNodeIds: string[];
   childGroupIds: string[];
+  status: WorkflowStatus;
 }
 
 export interface WorkflowConnector {
@@ -92,7 +97,7 @@ export const workflowSlice = createSlice({
         state.nodes.push(action.payload);
       },
       prepare: (input: { skillName: string; x: number; y: number }) => ({
-        payload: { id: nanoid(), ...input },
+        payload: { id: nanoid(), status: "idle" as const, ...input },
       }),
     },
     moveNode: (
@@ -124,16 +129,32 @@ export const workflowSlice = createSlice({
           x: node.x + DUPLICATE_OFFSET,
           y: node.y + DUPLICATE_OFFSET,
           task: node.task,
+          status: "idle",
         });
       }
     },
-    setTask: (
-      state,
-      action: PayloadAction<{ id: string; task: string }>,
-    ) => {
+    setTask: (state, action: PayloadAction<{ id: string; task: string }>) => {
       const node = state.nodes.find((n) => n.id === action.payload.id);
       if (node) {
         node.task = action.payload.task.trim() || undefined;
+      }
+    },
+    setNodeStatus: (
+      state,
+      action: PayloadAction<{ id: string; status: WorkflowStatus }>,
+    ) => {
+      const node = state.nodes.find((n) => n.id === action.payload.id);
+      if (node) {
+        node.status = action.payload.status;
+      }
+    },
+    setGroupStatus: (
+      state,
+      action: PayloadAction<{ id: string; status: WorkflowStatus }>,
+    ) => {
+      const group = state.groups.find((g) => g.id === action.payload.id);
+      if (group) {
+        group.status = action.payload.status;
       }
     },
     addGroup: {
@@ -158,7 +179,7 @@ export const workflowSlice = createSlice({
         h: number;
         childNodeIds: string[];
         childGroupIds: string[];
-      }) => ({ payload: { id: nanoid(), ...input } }),
+      }) => ({ payload: { id: nanoid(), status: "idle" as const, ...input } }),
     },
     moveGroup: (
       state,
@@ -228,7 +249,9 @@ export const workflowSlice = createSlice({
       }) => ({ payload: { id: nanoid(), ...input } }),
     },
     removeConnector: (state, action: PayloadAction<string>) => {
-      state.connectors = state.connectors.filter((c) => c.id !== action.payload);
+      state.connectors = state.connectors.filter(
+        (c) => c.id !== action.payload,
+      );
     },
     setScale: (state, action: PayloadAction<number>) => {
       state.scale = clampScale(action.payload);
@@ -251,6 +274,8 @@ export const {
   removeNode,
   duplicateNode,
   setTask,
+  setNodeStatus,
+  setGroupStatus,
   addGroup,
   moveGroup,
   removeGroup,

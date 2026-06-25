@@ -1,7 +1,11 @@
 import { useRef } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { useTheme } from "../../../store/hooks";
-import type { Port, WorkflowGroup as Group } from "../../../store/workflowSlice";
+import { statusPalette } from "../../../utils";
+import type {
+  Port,
+  WorkflowGroup as Group,
+} from "../../../store/workflowSlice";
 import { IconButton } from "../../ui/IconButton";
 import { PlayIcon, TrashIcon } from "../../ui/icons";
 
@@ -13,10 +17,6 @@ const PORT_POSITION: Record<Port, CSSProperties> = {
   left: { left: 0, top: "50%" },
   right: { left: "100%", top: "50%" },
 };
-
-/** Blue accent shared by the group outline, fill and ports. */
-const GROUP_STROKE = "#3B82F6";
-const GROUP_FILL = "rgba(59, 130, 246, 0.08)";
 
 interface WorkflowGroupProps {
   group: Group;
@@ -41,6 +41,7 @@ export function WorkflowGroup({
   onPortPointerDown,
 }: WorkflowGroupProps) {
   const { theme } = useTheme();
+  const { accent, fill } = statusPalette(theme, group.status);
   // Pointer position at drag start and the group origin at that moment.
   const origin = useRef<{
     px: number;
@@ -87,9 +88,9 @@ export function WorkflowGroup({
         width: group.w,
         height: group.h,
         boxSizing: "border-box",
-        border: `2px dashed ${GROUP_STROKE}`,
+        border: `2px dashed ${accent}`,
         borderRadius: theme.borderRadius.md,
-        background: GROUP_FILL,
+        background: fill,
         cursor: "grab",
         touchAction: "none",
         zIndex: 0,
@@ -112,7 +113,7 @@ export function WorkflowGroup({
             height: 12,
             borderRadius: "50%",
             background: theme.colors.surface,
-            border: `2px solid ${GROUP_STROKE}`,
+            border: `2px solid ${accent}`,
             transform: "translate(-50%, -50%)",
             cursor: "crosshair",
             zIndex: 2,
