@@ -119,7 +119,10 @@ export function SaveIcon({ size = 16 }: IconProps) {
  * A stop square centered inside a spinning loading ring — signals a running
  * task that can be stopped. Drop it inside an IconButton as its children.
  */
-export function StoppedLoading({ size = 16 }: IconProps) {
+export function StoppedLoading({
+  size = 16,
+  color = "currentColor",
+}: IconProps & { color?: string }) {
   return (
     <svg
       width={size}
@@ -133,14 +136,14 @@ export function StoppedLoading({ size = 16 }: IconProps) {
         cx="12"
         cy="12"
         r="9"
-        stroke="currentColor"
+        stroke={color}
         strokeOpacity={0.25}
         strokeWidth={2}
       />
       {/* Spinning arc. */}
       <path
         d="M12 3 a9 9 0 0 1 9 9"
-        stroke="currentColor"
+        stroke={color}
         strokeWidth={2}
         strokeLinecap="round"
       >
@@ -154,7 +157,7 @@ export function StoppedLoading({ size = 16 }: IconProps) {
         />
       </path>
       {/* Center stop square. */}
-      <rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor" />
+      <rect x="9" y="9" width="6" height="6" rx="1" fill={color} />
     </svg>
   );
 }

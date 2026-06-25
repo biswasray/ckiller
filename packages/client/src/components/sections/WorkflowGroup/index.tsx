@@ -7,7 +7,8 @@ import type {
   WorkflowGroup as Group,
 } from "../../../store/workflowSlice";
 import { IconButton } from "../../ui/IconButton";
-import { PlayIcon, TrashIcon } from "../../ui/icons";
+import { PlayIcon, StoppedLoading, TrashIcon } from "../../ui/icons";
+import type { WorkflowStatus } from "../../../store/workflowSlice";
 
 const PORTS: Port[] = ["top", "bottom", "left", "right"];
 
@@ -23,7 +24,7 @@ interface WorkflowGroupProps {
   /** Current canvas zoom — drag deltas are divided by this to stay accurate. */
   scale: number;
   onMove: (id: string, x: number, y: number) => void;
-  onRun: (id: string) => void;
+  onSetStatus: (id: string, status: WorkflowStatus) => void;
   onDelete: (id: string) => void;
   onPortPointerDown: (
     groupId: string,
@@ -36,7 +37,7 @@ export function WorkflowGroup({
   group,
   scale,
   onMove,
-  onRun,
+  onSetStatus,
   onDelete,
   onPortPointerDown,
 }: WorkflowGroupProps) {
@@ -130,9 +131,21 @@ export function WorkflowGroup({
           gap: theme.spacing.xs,
         }}
       >
-        <IconButton ariaLabel="Run group" onClick={() => onRun(group.id)}>
-          <PlayIcon />
-        </IconButton>
+        {group.status === "running" ? (
+          <IconButton
+            ariaLabel="Stop group"
+            onClick={() => onSetStatus(group.id, "idle")}
+          >
+            <StoppedLoading color={accent} />
+          </IconButton>
+        ) : (
+          <IconButton
+            ariaLabel="Run group"
+            onClick={() => onSetStatus(group.id, "running")}
+          >
+            <PlayIcon />
+          </IconButton>
+        )}
         <IconButton
           ariaLabel="Dissolve group"
           onClick={() => onDelete(group.id)}

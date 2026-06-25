@@ -13,8 +13,10 @@ import {
   EditIcon,
   PlayIcon,
   SaveIcon,
+  StoppedLoading,
   TrashIcon,
 } from "../../ui/icons";
+import type { WorkflowStatus } from "../../../store/workflowSlice";
 
 const CARD_WIDTH = 260;
 const PORTS: Port[] = ["top", "bottom", "left", "right"];
@@ -35,7 +37,7 @@ interface WorkflowCardProps {
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
   onSetTask: (id: string, task: string) => void;
-  onRun: (id: string) => void;
+  onSetStatus: (id: string, status: WorkflowStatus) => void;
   onResize: (id: string, w: number, h: number) => void;
   onPortPointerDown: (
     nodeId: string,
@@ -52,7 +54,7 @@ export function WorkflowCard({
   onDuplicate,
   onDelete,
   onSetTask,
-  onRun,
+  onSetStatus,
   onResize,
   onPortPointerDown,
 }: WorkflowCardProps) {
@@ -248,9 +250,21 @@ export function WorkflowCard({
               <IconButton ariaLabel="Edit task" onClick={startEdit}>
                 <EditIcon />
               </IconButton>
-              <IconButton ariaLabel="Run task" onClick={() => onRun(node.id)}>
-                <PlayIcon />
-              </IconButton>
+              {node.status === "running" ? (
+                <IconButton
+                  ariaLabel="Stop task"
+                  onClick={() => onSetStatus(node.id, "idle")}
+                >
+                  <StoppedLoading color={accent} />
+                </IconButton>
+              ) : (
+                <IconButton
+                  ariaLabel="Run task"
+                  onClick={() => onSetStatus(node.id, "running")}
+                >
+                  <PlayIcon />
+                </IconButton>
+              )}
             </div>
           </>
         )}

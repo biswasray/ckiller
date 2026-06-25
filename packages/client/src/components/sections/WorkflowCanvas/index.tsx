@@ -4,6 +4,7 @@ import type {
   PointerEvent as ReactPointerEvent,
 } from "react";
 import { useAppDispatch, useAppSelector, useTheme } from "../../../store/hooks";
+import { statusPalette } from "../../../utils";
 import type { Skill } from "../../../interfaces";
 import {
   addConnector,
@@ -16,6 +17,8 @@ import {
   removeGroup,
   removeNode,
   resetZoom,
+  setGroupStatus,
+  setNodeStatus,
   setTask,
   zoomIn,
   zoomOut,
@@ -23,6 +26,7 @@ import {
 import type {
   Port,
   WorkflowGroup as Group,
+  WorkflowStatus,
 } from "../../../store/workflowSlice";
 import { IconButton } from "../../ui/IconButton";
 import { Label } from "../../ui/Label";
@@ -174,6 +178,14 @@ export function WorkflowCanvas({
     return map;
   }, [nodes, wfGroups, sizes]);
 
+  // id -> execution status, used to tint connectors by their source.
+  const statusById = useMemo(() => {
+    const map = new Map<string, WorkflowStatus>();
+    nodes.forEach((node) => map.set(node.id, node.status));
+    wfGroups.forEach((g) => map.set(g.id, g.status));
+    return map;
+  }, [nodes, wfGroups]);
+
   const handleResize = useCallback((id: string, w: number, h: number) => {
     setSizes((prev) => {
       const cur = prev[id];
@@ -269,9 +281,14 @@ export function WorkflowCanvas({
         portPoint(target, connector.targetPort),
         connector.targetPort,
       );
-      return { id: connector.id, d, mid };
+      const color = statusPalette(theme, statusById.get(connector.sourceId))
+        .accent;
+      return { id: connector.id, d, mid, color };
     })
-    .filter((c): c is { id: string; d: string; mid: Point } => c !== null);
+    .filter(
+      (c): c is { id: string; d: string; mid: Point; color: string } =>
+        c !== null,
+    );
 
   const pendingPath = (() => {
     if (!pending || !pointerWorld) return null;
@@ -373,7 +390,8 @@ export function WorkflowCanvas({
               orient="auto"
               markerUnits="strokeWidth"
             >
-              <path d="M0,0 L8,3 L0,6 Z" fill={theme.colors.textSecondary} />
+              {/* context-stroke makes the arrowhead inherit each path's color. */}
+              <path d="M0,0 L8,3 L0,6 Z" fill="context-stroke" />
             </marker>
           </defs>
           {drawnConnectors.map((c) => (
@@ -381,7 +399,7 @@ export function WorkflowCanvas({
               key={c.id}
               d={c.d}
               fill="none"
-              stroke={theme.colors.textSecondary}
+              stroke={c.color}
               strokeWidth={2}
               markerEnd="url(#wf-arrow)"
             />
@@ -404,7 +422,7 @@ export function WorkflowCanvas({
             group={group}
             scale={scale}
             onMove={(id, x, y) => dispatch(moveGroup({ id, x, y }))}
-            onRun={(id) => console.log("run group", id)}
+            onSetStatus={(id, status) => dispatch(setGroupStatus({ id, status }))}
             onDelete={(id) => dispatch(removeGroup(id))}
             onPortPointerDown={handlePortPointerDown}
           />
@@ -420,7 +438,7 @@ export function WorkflowCanvas({
             onDuplicate={(id) => dispatch(duplicateNode(id))}
             onDelete={(id) => dispatch(removeNode(id))}
             onSetTask={(id, task) => dispatch(setTask({ id, task }))}
-            onRun={(id) => console.log("run", id)}
+            onSetStatus={(id, status) => dispatch(setNodeStatus({ id, status }))}
             onResize={handleResize}
             onPortPointerDown={handlePortPointerDown}
           />
