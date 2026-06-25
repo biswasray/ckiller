@@ -17,6 +17,7 @@ import {
   removeGroup,
   removeNode,
   resetZoom,
+  setGroupBounds,
   setGroupStatus,
   setNodeStatus,
   setTask,
@@ -185,6 +186,59 @@ export function WorkflowCanvas({
     wfGroups.forEach((g) => map.set(g.id, g.status));
     return map;
   }, [nodes, wfGroups]);
+
+  // Auto-fit each group's box around its children as they move/resize.
+  useEffect(() => {
+    if (wfGroups.length === 0) return;
+    const byId = new Map(wfGroups.map((g) => [g.id, g]));
+    const cache = new Map<string, Rect>();
+    // Desired bounds = padded union of a group's direct children, recursing
+    // into child groups so nested groups resolve to their own fitted bounds.
+    const fit = (id: string): Rect | null => {
+      const cached = cache.get(id);
+      if (cached) return cached;
+      const group = byId.get(id);
+      if (!group) return null;
+      const rects: Rect[] = [];
+      group.childNodeIds.forEach((nid) => {
+        const r = entitiesById.get(nid);
+        if (r) rects.push(r);
+      });
+      group.childGroupIds.forEach((gid) => {
+        const r = fit(gid);
+        if (r) rects.push(r);
+      });
+      const bounds =
+        rects.length === 0
+          ? { x: group.x, y: group.y, w: group.w, h: group.h }
+          : {
+              x: Math.min(...rects.map((r) => r.x)) - GROUP_PADDING,
+              y: Math.min(...rects.map((r) => r.y)) - GROUP_PADDING,
+              w:
+                Math.max(...rects.map((r) => r.x + r.w)) -
+                Math.min(...rects.map((r) => r.x)) +
+                GROUP_PADDING * 2,
+              h:
+                Math.max(...rects.map((r) => r.y + r.h)) -
+                Math.min(...rects.map((r) => r.y)) +
+                GROUP_PADDING * 2,
+            };
+      cache.set(id, bounds);
+      return bounds;
+    };
+    wfGroups.forEach((g) => {
+      const b = fit(g.id);
+      if (!b) return;
+      if (
+        Math.abs(b.x - g.x) > 0.5 ||
+        Math.abs(b.y - g.y) > 0.5 ||
+        Math.abs(b.w - g.w) > 0.5 ||
+        Math.abs(b.h - g.h) > 0.5
+      ) {
+        dispatch(setGroupBounds({ id: g.id, ...b }));
+      }
+    });
+  }, [nodes, wfGroups, entitiesById, dispatch]);
 
   const handleResize = useCallback((id: string, w: number, h: number) => {
     setSizes((prev) => {

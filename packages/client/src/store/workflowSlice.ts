@@ -209,6 +209,26 @@ export const workflowSlice = createSlice({
         }
       });
     },
+    setGroupBounds: (
+      state,
+      action: PayloadAction<{
+        id: string;
+        x: number;
+        y: number;
+        w: number;
+        h: number;
+      }>,
+    ) => {
+      // Resize/reposition a group in place — does NOT move its children
+      // (used to auto-fit the box around members as they are dragged).
+      const group = state.groups.find((g) => g.id === action.payload.id);
+      if (group) {
+        group.x = action.payload.x;
+        group.y = action.payload.y;
+        group.w = action.payload.w;
+        group.h = action.payload.h;
+      }
+    },
     removeGroup: (state, action: PayloadAction<string>) => {
       const id = action.payload;
       // Dissolve the group only — its children become free again.
@@ -278,6 +298,7 @@ export const {
   setGroupStatus,
   addGroup,
   moveGroup,
+  setGroupBounds,
   removeGroup,
   addConnector,
   removeConnector,
