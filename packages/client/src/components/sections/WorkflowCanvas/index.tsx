@@ -23,6 +23,7 @@ import {
   setTask,
   zoomIn,
   zoomOut,
+  selectActiveBoard,
 } from "../../../store/workflowSlice";
 import type {
   Port,
@@ -139,7 +140,7 @@ export function WorkflowCanvas({
     groups: wfGroups,
     connectors,
     scale,
-  } = useAppSelector((state) => state.workflow);
+  } = useAppSelector(selectActiveBoard);
   const skillGroups = useAppSelector((state) => state.skills.groups);
   const containerRef = useRef<HTMLDivElement>(null);
 

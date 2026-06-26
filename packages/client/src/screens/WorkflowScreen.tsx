@@ -1,22 +1,36 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Button,
   CollapsibleSection,
+  CopyIcon,
   Header,
+  IconButton,
   Label,
   Sidebar,
   SKILL_DRAG_MIME,
   TextInput,
+  TrashIcon,
   WorkflowCanvas,
 } from "../components";
 import { useAppDispatch, useAppSelector, useTheme } from "../store/hooks";
 import { fetchSkills } from "../store/skillsSlice";
+import {
+  addWorkflow,
+  displayWorkflow,
+  duplicateWorkflow,
+  removeWorkflow,
+  renameWorkflow,
+  selectActiveWorkflow,
+  selectWorkflows,
+} from "../store/workflowSlice";
 
 export function WorkflowScreen() {
   const { theme } = useTheme();
   const dispatch = useAppDispatch();
   const { groups, loading, error } = useAppSelector((state) => state.skills);
+  const workflows = useAppSelector(selectWorkflows);
+  const activeWorkflow = useAppSelector(selectActiveWorkflow);
 
-  const [title, setTitle] = useState("Unnamed");
   const [query, setQuery] = useState("");
   const [selectMode, setSelectMode] = useState(false);
 
@@ -35,6 +49,16 @@ export function WorkflowScreen() {
         skill.description.toLowerCase().includes(q),
     );
   }, [groups, query]);
+
+  // Displayed workflow pinned to the top, then newest first.
+  const sortedWorkflows = useMemo(
+    () =>
+      [...workflows].sort((a, b) => {
+        if (a.isDisplayed !== b.isDisplayed) return a.isDisplayed ? -1 : 1;
+        return b.createdAt.localeCompare(a.createdAt);
+      }),
+    [workflows],
+  );
 
   return (
     <div
@@ -59,9 +83,7 @@ export function WorkflowScreen() {
           </div>
 
           <div style={{ marginTop: theme.spacing.lg }}>
-            {loading && (
-              <Label variant="muted">Loading skills…</Label>
-            )}
+            {loading && <Label variant="muted">Loading skills…</Label>}
             {error && (
               <Label variant="muted" style={{ color: theme.colors.error }}>
                 {error}
@@ -93,6 +115,82 @@ export function WorkflowScreen() {
             </ul>
           </div>
         </CollapsibleSection>
+
+        <CollapsibleSection title="Workflows">
+          <div style={{ marginTop: theme.spacing.sm }}>
+            <Button
+              onClick={() => dispatch(addWorkflow())}
+              style={{ width: "100%" }}
+            >
+              + New workflow
+            </Button>
+          </div>
+
+          <ul
+            style={{
+              listStyle: "none",
+              margin: `${theme.spacing.lg}px 0 0`,
+              padding: 0,
+            }}
+          >
+            {sortedWorkflows.map((workflow) => {
+              const isActive = workflow.isDisplayed;
+              return (
+                <li
+                  key={workflow.id}
+                  onClick={() => dispatch(displayWorkflow(workflow.id))}
+                  title={workflow.title || "Unnamed"}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: theme.spacing.sm,
+                    padding: `${theme.spacing.xs}px ${theme.spacing.sm}px`,
+                    marginBottom: theme.spacing.xs,
+                    borderRadius: theme.borderRadius.sm,
+                    cursor: "pointer",
+                    background: isActive
+                      ? theme.colors.surfaceVariant
+                      : "transparent",
+                    color: isActive
+                      ? theme.colors.text
+                      : theme.colors.textSecondary,
+                    fontSize: theme.typography.fontSize.md,
+                    fontWeight: isActive
+                      ? theme.typography.fontWeight.semiBold
+                      : theme.typography.fontWeight.regular,
+                  }}
+                >
+                  <span
+                    style={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {workflow.title || "Unnamed"}
+                  </span>
+                  <div style={{ display: "flex", gap: theme.spacing.xs }}>
+                    <IconButton
+                      ariaLabel="Copy workflow"
+                      size={24}
+                      onClick={() => dispatch(duplicateWorkflow(workflow.id))}
+                    >
+                      <CopyIcon size={14} />
+                    </IconButton>
+                    <IconButton
+                      ariaLabel="Delete workflow"
+                      size={24}
+                      onClick={() => dispatch(removeWorkflow(workflow.id))}
+                    >
+                      <TrashIcon size={14} />
+                    </IconButton>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </CollapsibleSection>
       </Sidebar>
 
       <div
@@ -104,8 +202,11 @@ export function WorkflowScreen() {
         }}
       >
         <Header
-          title={title}
-          onTitleChange={setTitle}
+          title={activeWorkflow?.title ?? ""}
+          onTitleChange={(value) =>
+            activeWorkflow &&
+            dispatch(renameWorkflow({ id: activeWorkflow.id, title: value }))
+          }
           selectActive={selectMode}
           onToggleSelect={() => setSelectMode((v) => !v)}
         />

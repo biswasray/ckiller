@@ -1,4 +1,5 @@
 import { createSlice, nanoid, PayloadAction } from "@reduxjs/toolkit";
+import type { RootState } from "./index";
 
 /** Execution state of a node or group, used to drive its color. */
 export type WorkflowStatus = "idle" | "running" | "success" | "failed";
@@ -37,11 +38,25 @@ export interface WorkflowConnector {
   targetPort: Port;
 }
 
-interface WorkflowState {
+/** The canvas contents of a single workflow. */
+export interface WorkflowBoard {
   nodes: WorkflowNode[];
   groups: WorkflowGroup[];
   connectors: WorkflowConnector[];
   scale: number;
+}
+
+/** A named, persisted workflow. Exactly one is `isDisplayed` at a time. */
+export interface Workflow {
+  id: string;
+  title: string;
+  createdAt: string;
+  isDisplayed: boolean;
+  workflowBoard: WorkflowBoard;
+}
+
+interface WorkflowState {
+  workflows: Workflow[];
 }
 
 /** Collect every node and group nested (directly or transitively) under a group. */
@@ -81,11 +96,32 @@ const DUPLICATE_OFFSET = 24;
 const clampScale = (value: number) =>
   Math.min(MAX_SCALE, Math.max(MIN_SCALE, Number(value.toFixed(2))));
 
-const initialState: WorkflowState = {
+/** A fresh, empty canvas. */
+export const emptyBoard = (): WorkflowBoard => ({
   nodes: [],
   groups: [],
   connectors: [],
   scale: 1,
+});
+
+/** Build a new (displayed) workflow, optionally seeded with an existing board. */
+export const makeWorkflow = (
+  title = "Unnamed",
+  board: WorkflowBoard = emptyBoard(),
+): Workflow => ({
+  id: nanoid(),
+  title,
+  createdAt: new Date().toISOString(),
+  isDisplayed: true,
+  workflowBoard: board,
+});
+
+/** The board of the currently displayed workflow (a draft, when inside a reducer). */
+const activeBoard = (state: WorkflowState): WorkflowBoard | undefined =>
+  state.workflows.find((w) => w.isDisplayed)?.workflowBoard;
+
+const initialState: WorkflowState = {
+  workflows: [makeWorkflow("Unnamed")],
 };
 
 export const workflowSlice = createSlice({
@@ -94,7 +130,9 @@ export const workflowSlice = createSlice({
   reducers: {
     addNode: {
       reducer: (state, action: PayloadAction<WorkflowNode>) => {
-        state.nodes.push(action.payload);
+        const board = activeBoard(state);
+        if (!board) return;
+        board.nodes.push(action.payload);
       },
       prepare: (input: { skillName: string; x: number; y: number }) => ({
         payload: { id: nanoid(), status: "idle" as const, ...input },
@@ -104,26 +142,32 @@ export const workflowSlice = createSlice({
       state,
       action: PayloadAction<{ id: string; x: number; y: number }>,
     ) => {
-      const node = state.nodes.find((n) => n.id === action.payload.id);
+      const board = activeBoard(state);
+      if (!board) return;
+      const node = board.nodes.find((n) => n.id === action.payload.id);
       if (node) {
         node.x = action.payload.x;
         node.y = action.payload.y;
       }
     },
     removeNode: (state, action: PayloadAction<string>) => {
+      const board = activeBoard(state);
+      if (!board) return;
       const id = action.payload;
-      state.nodes = state.nodes.filter((n) => n.id !== id);
-      state.connectors = state.connectors.filter(
+      board.nodes = board.nodes.filter((n) => n.id !== id);
+      board.connectors = board.connectors.filter(
         (c) => c.sourceId !== id && c.targetId !== id,
       );
-      state.groups.forEach((g) => {
+      board.groups.forEach((g) => {
         g.childNodeIds = g.childNodeIds.filter((cid) => cid !== id);
       });
     },
     duplicateNode: (state, action: PayloadAction<string>) => {
-      const node = state.nodes.find((n) => n.id === action.payload);
+      const board = activeBoard(state);
+      if (!board) return;
+      const node = board.nodes.find((n) => n.id === action.payload);
       if (node) {
-        state.nodes.push({
+        board.nodes.push({
           id: nanoid(),
           skillName: node.skillName,
           x: node.x + DUPLICATE_OFFSET,
@@ -134,7 +178,9 @@ export const workflowSlice = createSlice({
       }
     },
     setTask: (state, action: PayloadAction<{ id: string; task: string }>) => {
-      const node = state.nodes.find((n) => n.id === action.payload.id);
+      const board = activeBoard(state);
+      if (!board) return;
+      const node = board.nodes.find((n) => n.id === action.payload.id);
       if (node) {
         node.task = action.payload.task.trim() || undefined;
       }
@@ -143,7 +189,9 @@ export const workflowSlice = createSlice({
       state,
       action: PayloadAction<{ id: string; status: WorkflowStatus }>,
     ) => {
-      const node = state.nodes.find((n) => n.id === action.payload.id);
+      const board = activeBoard(state);
+      if (!board) return;
+      const node = board.nodes.find((n) => n.id === action.payload.id);
       if (node) {
         node.status = action.payload.status;
       }
@@ -152,16 +200,20 @@ export const workflowSlice = createSlice({
       state,
       action: PayloadAction<{ id: string; status: WorkflowStatus }>,
     ) => {
-      const group = state.groups.find((g) => g.id === action.payload.id);
+      const board = activeBoard(state);
+      if (!board) return;
+      const group = board.groups.find((g) => g.id === action.payload.id);
       if (group) {
         group.status = action.payload.status;
       }
     },
     addGroup: {
       reducer: (state, action: PayloadAction<WorkflowGroup>) => {
+        const board = activeBoard(state);
+        if (!board) return;
         const group = action.payload;
         // A node/group may only belong to one group: detach from any other.
-        state.groups.forEach((g) => {
+        board.groups.forEach((g) => {
           if (g.id === group.id) return;
           g.childNodeIds = g.childNodeIds.filter(
             (id) => !group.childNodeIds.includes(id),
@@ -170,7 +222,7 @@ export const workflowSlice = createSlice({
             (id) => !group.childGroupIds.includes(id),
           );
         });
-        state.groups.push(group);
+        board.groups.push(group);
       },
       prepare: (input: {
         x: number;
@@ -185,24 +237,26 @@ export const workflowSlice = createSlice({
       state,
       action: PayloadAction<{ id: string; x: number; y: number }>,
     ) => {
-      const group = state.groups.find((g) => g.id === action.payload.id);
+      const board = activeBoard(state);
+      if (!board) return;
+      const group = board.groups.find((g) => g.id === action.payload.id);
       if (!group) return;
       const dx = action.payload.x - group.x;
       const dy = action.payload.y - group.y;
       const nodeIds = new Set<string>();
       const groupIds = new Set<string>();
-      collectDescendants(state.groups, group.id, nodeIds, groupIds);
+      collectDescendants(board.groups, group.id, nodeIds, groupIds);
       group.x = action.payload.x;
       group.y = action.payload.y;
       groupIds.forEach((id) => {
-        const g = state.groups.find((s) => s.id === id);
+        const g = board.groups.find((s) => s.id === id);
         if (g) {
           g.x += dx;
           g.y += dy;
         }
       });
       nodeIds.forEach((id) => {
-        const n = state.nodes.find((s) => s.id === id);
+        const n = board.nodes.find((s) => s.id === id);
         if (n) {
           n.x += dx;
           n.y += dy;
@@ -221,7 +275,9 @@ export const workflowSlice = createSlice({
     ) => {
       // Resize/reposition a group in place — does NOT move its children
       // (used to auto-fit the box around members as they are dragged).
-      const group = state.groups.find((g) => g.id === action.payload.id);
+      const board = activeBoard(state);
+      if (!board) return;
+      const group = board.groups.find((g) => g.id === action.payload.id);
       if (group) {
         group.x = action.payload.x;
         group.y = action.payload.y;
@@ -230,28 +286,32 @@ export const workflowSlice = createSlice({
       }
     },
     removeGroup: (state, action: PayloadAction<string>) => {
+      const board = activeBoard(state);
+      if (!board) return;
       const id = action.payload;
       // Dissolve the group only — its children become free again.
-      state.groups = state.groups.filter((g) => g.id !== id);
-      state.groups.forEach((g) => {
+      board.groups = board.groups.filter((g) => g.id !== id);
+      board.groups.forEach((g) => {
         g.childGroupIds = g.childGroupIds.filter((cid) => cid !== id);
       });
-      state.connectors = state.connectors.filter(
+      board.connectors = board.connectors.filter(
         (c) => c.sourceId !== id && c.targetId !== id,
       );
     },
     addConnector: {
       reducer: (state, action: PayloadAction<WorkflowConnector>) => {
+        const board = activeBoard(state);
+        if (!board) return;
         const c = action.payload;
         if (c.sourceId === c.targetId) return; // no self-links
         // A group cannot connect to its own inner nodes/groups (either direction).
-        const srcIsGroup = state.groups.some((g) => g.id === c.sourceId);
-        const tgtIsGroup = state.groups.some((g) => g.id === c.targetId);
-        if (srcIsGroup && isDescendant(state.groups, c.sourceId, c.targetId))
+        const srcIsGroup = board.groups.some((g) => g.id === c.sourceId);
+        const tgtIsGroup = board.groups.some((g) => g.id === c.targetId);
+        if (srcIsGroup && isDescendant(board.groups, c.sourceId, c.targetId))
           return;
-        if (tgtIsGroup && isDescendant(state.groups, c.targetId, c.sourceId))
+        if (tgtIsGroup && isDescendant(board.groups, c.targetId, c.sourceId))
           return;
-        const duplicate = state.connectors.some(
+        const duplicate = board.connectors.some(
           (e) =>
             e.sourceId === c.sourceId &&
             e.sourcePort === c.sourcePort &&
@@ -259,7 +319,7 @@ export const workflowSlice = createSlice({
             e.targetPort === c.targetPort,
         );
         if (duplicate) return;
-        state.connectors.push(c);
+        board.connectors.push(c);
       },
       prepare: (input: {
         sourceId: string;
@@ -269,21 +329,85 @@ export const workflowSlice = createSlice({
       }) => ({ payload: { id: nanoid(), ...input } }),
     },
     removeConnector: (state, action: PayloadAction<string>) => {
-      state.connectors = state.connectors.filter(
+      const board = activeBoard(state);
+      if (!board) return;
+      board.connectors = board.connectors.filter(
         (c) => c.id !== action.payload,
       );
     },
     setScale: (state, action: PayloadAction<number>) => {
-      state.scale = clampScale(action.payload);
+      const board = activeBoard(state);
+      if (!board) return;
+      board.scale = clampScale(action.payload);
     },
     zoomIn: (state) => {
-      state.scale = clampScale(state.scale + SCALE_STEP);
+      const board = activeBoard(state);
+      if (!board) return;
+      board.scale = clampScale(board.scale + SCALE_STEP);
     },
     zoomOut: (state) => {
-      state.scale = clampScale(state.scale - SCALE_STEP);
+      const board = activeBoard(state);
+      if (!board) return;
+      board.scale = clampScale(board.scale - SCALE_STEP);
     },
     resetZoom: (state) => {
-      state.scale = 1;
+      const board = activeBoard(state);
+      if (!board) return;
+      board.scale = 1;
+    },
+
+    // ─── Workflow management ────────────────────────────────────────────────
+    addWorkflow: {
+      reducer: (state, action: PayloadAction<Workflow>) => {
+        state.workflows.forEach((w) => (w.isDisplayed = false));
+        state.workflows.push(action.payload);
+      },
+      prepare: (title?: string) => ({ payload: makeWorkflow(title ?? "Unnamed") }),
+    },
+    duplicateWorkflow: (state, action: PayloadAction<string>) => {
+      const source = state.workflows.find((w) => w.id === action.payload);
+      if (!source) return;
+      // Board ids are scoped to a board, so a deep clone keeping them is fine.
+      const copy: Workflow = {
+        id: nanoid(),
+        title: `${source.title} copy`,
+        createdAt: new Date().toISOString(),
+        isDisplayed: true,
+        workflowBoard: JSON.parse(JSON.stringify(source.workflowBoard)),
+      };
+      state.workflows.forEach((w) => (w.isDisplayed = false));
+      state.workflows.push(copy);
+    },
+    displayWorkflow: (state, action: PayloadAction<string>) => {
+      state.workflows.forEach((w) => {
+        w.isDisplayed = w.id === action.payload;
+      });
+    },
+    renameWorkflow: (
+      state,
+      action: PayloadAction<{ id: string; title: string }>,
+    ) => {
+      const workflow = state.workflows.find((w) => w.id === action.payload.id);
+      if (workflow) {
+        workflow.title = action.payload.title;
+      }
+    },
+    removeWorkflow: (state, action: PayloadAction<string>) => {
+      const removed = state.workflows.find((w) => w.id === action.payload);
+      state.workflows = state.workflows.filter((w) => w.id !== action.payload);
+      // Keep exactly one displayed workflow.
+      if (state.workflows.length === 0) {
+        state.workflows.push(makeWorkflow("Unnamed"));
+        return;
+      }
+      if (removed?.isDisplayed) {
+        const newest = state.workflows.reduce((a, b) =>
+          a.createdAt >= b.createdAt ? a : b,
+        );
+        state.workflows.forEach((w) => {
+          w.isDisplayed = w.id === newest.id;
+        });
+      }
     },
   },
 });
@@ -306,5 +430,22 @@ export const {
   zoomIn,
   zoomOut,
   resetZoom,
+  addWorkflow,
+  duplicateWorkflow,
+  displayWorkflow,
+  renameWorkflow,
+  removeWorkflow,
 } = workflowSlice.actions;
 export const workflowReducer = workflowSlice.reducer;
+
+// ─── Selectors ────────────────────────────────────────────────────────────
+/** Stable empty board so the canvas selector never returns a fresh object. */
+const EMPTY_BOARD: WorkflowBoard = emptyBoard();
+
+export const selectWorkflows = (state: RootState) => state.workflow.workflows;
+
+export const selectActiveWorkflow = (state: RootState): Workflow | undefined =>
+  state.workflow.workflows.find((w) => w.isDisplayed);
+
+export const selectActiveBoard = (state: RootState): WorkflowBoard =>
+  selectActiveWorkflow(state)?.workflowBoard ?? EMPTY_BOARD;
